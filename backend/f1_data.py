@@ -195,24 +195,60 @@ class FastF1Data:
 
     def get_drivers_info(self, session) -> list:
         """Returns list of {abbr, name, team, colour} for all session drivers."""
+        # Official 2021/2022+ team colours (matplotlib/fastf1.plotting crashes due to numpy conflict)
+        TEAM_COLOURS = {
+            "Mercedes": "#00D2BE",
+            "Red Bull Racing": "#3671C6",
+            "Ferrari": "#E8002D",
+            "McLaren": "#FF8000",
+            "Alpine F1 Team": "#0093CC",
+            "AlphaTauri": "#64C4FF",
+            "Aston Martin": "#358C75",
+            "Williams": "#64C4FF",
+            "Alfa Romeo": "#B12335",
+            "Haas F1 Team": "#B6BABD",
+            # 2022+
+            "Alpine": "#0093CC",
+            "Alfa Romeo F1 Team Stake": "#B12335",
+            "Haas": "#B6BABD",
+            "RB": "#6692FF",
+            "Kick Sauber": "#52E252",
+            "Williams Racing": "#64C4FF",
+        }
+        # Distinct fallback palette — 20 visually separated colours
+        FALLBACK_PALETTE = [
+            "#E8002D", "#3671C6", "#00D2BE", "#FF8000", "#0093CC",
+            "#B12335", "#358C75", "#64C4FF", "#B6BABD", "#FFD700",
+            "#FF69B4", "#7FFF00", "#FF6347", "#40E0D0", "#EE82EE",
+            "#FFA500", "#00CED1", "#DC143C", "#32CD32", "#9370DB",
+        ]
         drivers = []
-        for abbr in session.drivers:
+        used_colours = set()
+        palette_idx = 0
+        for abbr in sorted(session.drivers):  # sort for consistent palette assignment
             try:
                 info = session.get_driver(abbr)
-                try:
-                    colour = fastf1.plotting.get_team_color(info["TeamName"], session)
-                except Exception:
-                    colour = "#888888"
+                team = info.get("TeamName", "")
+                colour = TEAM_COLOURS.get(team)
+                # If team colour already used by teammate, shift hue slightly
+                if colour in used_colours:
+                    colour = colour + "CC"  # semi-transparent variant to distinguish
+                if not colour:
+                    colour = FALLBACK_PALETTE[palette_idx % len(FALLBACK_PALETTE)]
+                    palette_idx += 1
+                used_colours.add(colour)
                 drivers.append(
                     {
                         "abbr": abbr,
                         "name": f"{info.get('FirstName', '')} {info.get('LastName', '')}".strip(),
-                        "team": info.get("TeamName", ""),
+                        "team": team,
                         "colour": colour,
                     }
                 )
             except Exception:
-                drivers.append({"abbr": abbr, "name": abbr, "team": "", "colour": "#888888"})
+                colour = FALLBACK_PALETTE[palette_idx % len(FALLBACK_PALETTE)]
+                palette_idx += 1
+                drivers.append({"abbr": abbr, "name": abbr, "team": "", "colour": colour})
         return drivers
 
 
