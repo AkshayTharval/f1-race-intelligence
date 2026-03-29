@@ -59,16 +59,17 @@ def render(year: int, round_num: int, backend_url: str):
         name = driver_info.get("name", driver_abbr)
         team = driver_info.get("team", "")
 
-        is_highlighted = (not highlighted) or (driver_abbr in highlighted)
+        # Grey out this driver if the user made a selection AND this driver is NOT in it
+        is_greyed = bool(highlighted) and (driver_abbr not in highlighted)
 
-        if is_highlighted:
-            line_colour = colour
-            line_width = 2.5
-            opacity = 1.0
-        else:
+        if is_greyed:
             line_colour = "#444444"
             line_width = 1.0
-            opacity = 0.35
+            opacity = 0.3
+        else:
+            line_colour = colour
+            line_width = 2.5 if highlighted else 2.0
+            opacity = 1.0
 
         padded = (pos_list + [None] * total_laps)[:total_laps]
 
@@ -100,30 +101,62 @@ def render(year: int, round_num: int, backend_url: str):
     )
     fig.update_xaxes(title="Lap", gridcolor="#2a2a2a")
 
-    # Overlay race events
-    for event in events:
+    # Overlay race events — group SC/VSC pairs to shade the full period
+    # Find matching END events to draw filled regions
+    sc_start = None
+    vsc_start = None
+    event_markers = []  # (lap, type, label, colour) for vertical lines / regions
+
+    for event in sorted(events, key=lambda e: e.get("lap", 0)):
         lap = event.get("lap", 0)
         etype = event.get("type", "")
         if etype == "SAFETY_CAR":
+            sc_start = lap
+        elif etype == "SC_END" and sc_start is not None:
             fig.add_vrect(
-                x0=lap - 0.5, x1=lap + 2.5,
-                fillcolor="yellow", opacity=0.12, line_width=0,
-                annotation_text="SC", annotation_position="top left",
-                annotation=dict(font_color="yellow", font_size=10),
+                x0=sc_start - 0.3, x1=lap + 0.3,
+                fillcolor="#FFFF00", opacity=0.10, line_width=0,
             )
+            fig.add_annotation(
+                x=sc_start, y=0.5, yref="paper",
+                text=f"🟡 SC L{sc_start}–{lap}", showarrow=False,
+                font=dict(color="#FFDD00", size=10),
+                bgcolor="#111111", bordercolor="#FFDD00", borderwidth=1,
+                xanchor="left",
+            )
+            sc_start = None
         elif etype == "VSC":
+            vsc_start = lap
+        elif etype == "VSC_END" and vsc_start is not None:
             fig.add_vrect(
-                x0=lap - 0.5, x1=lap + 1.5,
-                fillcolor="orange", opacity=0.12, line_width=0,
-                annotation_text="VSC", annotation_position="top left",
-                annotation=dict(font_color="orange", font_size=10),
+                x0=vsc_start - 0.3, x1=lap + 0.3,
+                fillcolor="#FFA500", opacity=0.10, line_width=0,
             )
+            fig.add_annotation(
+                x=vsc_start, y=0.42, yref="paper",
+                text=f"🟠 VSC L{vsc_start}–{lap}", showarrow=False,
+                font=dict(color="#FFA500", size=10),
+                bgcolor="#111111", bordercolor="#FFA500", borderwidth=1,
+                xanchor="left",
+            )
+            vsc_start = None
         elif etype == "RED_FLAG":
             fig.add_vline(
-                x=lap, line_dash="dash", line_color="red", line_width=1.5,
-                annotation_text="RED FLAG", annotation_position="top left",
-                annotation=dict(font_color="red", font_size=10),
+                x=lap, line_dash="dash", line_color="#FF3333", line_width=2,
             )
+            fig.add_annotation(
+                x=lap, y=0.34, yref="paper",
+                text=f"🔴 Red Flag L{lap}", showarrow=False,
+                font=dict(color="#FF3333", size=10),
+                bgcolor="#111111", bordercolor="#FF3333", borderwidth=1,
+                xanchor="left",
+            )
+
+    # If SC/VSC never ended (end of race), still shade from start to last lap
+    if sc_start is not None:
+        fig.add_vrect(x0=sc_start - 0.3, x1=total_laps + 0.3, fillcolor="#FFFF00", opacity=0.10, line_width=0)
+    if vsc_start is not None:
+        fig.add_vrect(x0=vsc_start - 0.3, x1=total_laps + 0.3, fillcolor="#FFA500", opacity=0.10, line_width=0)
 
     fig.update_layout(
         height=620,
@@ -134,6 +167,10 @@ def render(year: int, round_num: int, backend_url: str):
             orientation="v", x=1.01, y=1,
             font=dict(size=10),
             tracegroupgap=0,
+            # Single-click legend item = isolate that driver (grey others)
+            # Double-click = restore all
+            itemclick="toggleothers",
+            itemdoubleclick="toggle",
         ),
         margin=dict(l=50, r=130, t=20, b=50),
         hovermode="x unified",
@@ -150,15 +187,17 @@ def render(year: int, round_num: int, backend_url: str):
 
     # ---- Race events legend ----
     if events:
-        with st.expander("Race Events"):
-            for e in events:
-                icon = {
-                    "SAFETY_CAR": "🟡 Safety Car",
-                    "VSC": "🟠 Virtual Safety Car",
-                    "RED_FLAG": "🔴 Red Flag",
-                    "GREEN": "🟢 Green Flag",
-                }.get(e["type"], "ℹ️")
-                st.write(f"**Lap {e['lap']}** — {icon}: {e['message']}")
+        with st.expander(f"Race Events ({len(events)})"):
+            icon_map = {
+                "SAFETY_CAR": "🟡 Safety Car In",
+                "SC_END": "🟡 Safety Car Out",
+                "VSC": "🟠 Virtual Safety Car In",
+                "VSC_END": "🟠 Virtual Safety Car Out",
+                "RED_FLAG": "🔴 Red Flag",
+            }
+            for e in sorted(events, key=lambda x: x["lap"]):
+                icon = icon_map.get(e["type"], "ℹ️")
+                st.write(f"**Lap {e['lap']}** — {icon}: *{e['message']}*")
 
     # ---- Position change table ----
     st.markdown("#### Position Changes (Grid → Finish)")

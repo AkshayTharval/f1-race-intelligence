@@ -148,8 +148,8 @@ class FastF1Data:
 
     def get_race_events(self, session) -> list:
         """
-        Parse safety car, VSC, red flag periods from session messages.
-        Returns list of {lap, type, message}.
+        Parse safety car, VSC, and red flag events from race control messages.
+        Returns list of {lap, type, message}. Uses the Lap column directly.
         """
         try:
             messages = session.race_control_messages
@@ -157,40 +157,41 @@ class FastF1Data:
             return []
         if messages is None or messages.empty:
             return []
+
         events = []
-        laps = session.laps[["LapNumber", "Time"]].dropna()
         for _, row in messages.iterrows():
             msg = str(row.get("Message", ""))
             category = str(row.get("Category", ""))
             flag = str(row.get("Flag", ""))
+
+            # Skip non-race-incident messages
+            if "CHEQUERED" in msg or "BLUE" in flag or "YELLOW" in flag or "CLEAR" in flag:
+                continue
+
             event_type = None
-            if "SAFETY CAR DEPLOYED" in msg or (category == "SafetyCar" and "DEPLOYED" in msg):
-                event_type = "SAFETY_CAR"
-            elif "VIRTUAL SAFETY CAR" in msg and "DEPLOYED" in msg:
+            # VSC must be checked before SC (both say "SAFETY CAR")
+            if "VIRTUAL SAFETY CAR" in msg and "DEPLOYED" in msg:
                 event_type = "VSC"
-            elif "RED FLAG" in msg or flag == "RED":
+            elif "VIRTUAL SAFETY CAR" in msg and "ENDING" in msg:
+                event_type = "VSC_END"
+            elif category == "SafetyCar" and "DEPLOYED" in msg:
+                event_type = "SAFETY_CAR"
+            elif category == "SafetyCar" and ("IN THIS LAP" in msg or "WITHDRAWN" in msg or "ENDING" in msg):
+                event_type = "SC_END"
+            elif flag == "RED" or "RED FLAG" in msg:
                 event_type = "RED_FLAG"
-            elif "SAFETY CAR IN THIS LAP" in msg or "SAFETY CAR WITHDRAWN" in msg:
-                event_type = "GREEN"
-            if event_type:
-                # Map timestamp to nearest lap by converting both to total_seconds
-                msg_time = row.get("Time")
-                lap_num = 1
-                if msg_time is not None and not laps.empty:
-                    try:
-                        # Both laps["Time"] and msg_time should be timedeltas; convert to seconds
-                        def to_seconds(t):
-                            if hasattr(t, "total_seconds"):
-                                return t.total_seconds()
-                            return float(t)
-                        msg_sec = to_seconds(msg_time)
-                        lap_secs = laps["Time"].apply(to_seconds)
-                        diffs = (lap_secs - msg_sec).abs()
-                        idx = diffs.idxmin()
-                        lap_num = int(laps.loc[idx, "LapNumber"])
-                    except Exception:
-                        lap_num = 1
-                events.append({"lap": lap_num, "type": event_type, "message": msg})
+
+            if event_type is None:
+                continue
+
+            # Use the Lap column directly — it's already in race_control_messages
+            try:
+                lap_num = int(row["Lap"])
+            except (KeyError, TypeError, ValueError):
+                continue
+
+            events.append({"lap": lap_num, "type": event_type, "message": msg})
+
         return events
 
     def get_drivers_info(self, session) -> list:
@@ -225,14 +226,25 @@ class FastF1Data:
         drivers = []
         used_colours = set()
         palette_idx = 0
-        for abbr in sorted(session.drivers):  # sort for consistent palette assignment
+        # session.drivers contains driver numbers (e.g. "44"), not abbreviations.
+        # We need info["Abbreviation"] (e.g. "HAM") to match session.laps["Driver"].
+        for driver_num in sorted(session.drivers):
             try:
-                info = session.get_driver(abbr)
+                info = session.get_driver(driver_num)
+                # Use 3-letter abbreviation so it matches session.laps["Driver"] keys
+                abbr = info.get("Abbreviation") or info.get("DriverId") or driver_num
                 team = info.get("TeamName", "")
                 colour = TEAM_COLOURS.get(team)
-                # If team colour already used by teammate, shift hue slightly
+                # Teammates share team colour — give second driver a lighter shade
                 if colour in used_colours:
-                    colour = colour + "CC"  # semi-transparent variant to distinguish
+                    r = int(colour[1:3], 16)
+                    g = int(colour[3:5], 16)
+                    b = int(colour[5:7], 16)
+                    # Brighten by blending toward white
+                    r = min(255, r + 60)
+                    g = min(255, g + 60)
+                    b = min(255, b + 60)
+                    colour = f"#{r:02X}{g:02X}{b:02X}"
                 if not colour:
                     colour = FALLBACK_PALETTE[palette_idx % len(FALLBACK_PALETTE)]
                     palette_idx += 1
@@ -248,7 +260,7 @@ class FastF1Data:
             except Exception:
                 colour = FALLBACK_PALETTE[palette_idx % len(FALLBACK_PALETTE)]
                 palette_idx += 1
-                drivers.append({"abbr": abbr, "name": abbr, "team": "", "colour": colour})
+                drivers.append({"abbr": driver_num, "name": driver_num, "team": "", "colour": colour})
         return drivers
 
 
