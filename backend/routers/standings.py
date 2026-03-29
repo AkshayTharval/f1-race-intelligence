@@ -40,7 +40,7 @@ async def get_season_standings(year: int, response: Response):
         )
 
     # All drivers across the season
-    all_drivers: dict[str, dict] = {}
+    all_drivers: dict = {}
     for rnd in progression:
         for entry in rnd["standings"]:
             driver = entry.get("Driver", {})

@@ -43,7 +43,7 @@ class FastF1Data:
             _session_cache[key] = session
         return _session_cache[key]
 
-    def get_lap_positions(self, session) -> dict[str, list]:
+    def get_lap_positions(self, session) -> dict:
         """
         Returns {driver_abbr: [position_lap1, position_lap2, ...]}
         Forward-fills NaN, sets None after last recorded lap for retired drivers.
@@ -74,7 +74,7 @@ class FastF1Data:
             result[driver] = positions_list
         return result
 
-    def get_tyre_stints(self, session) -> list[dict]:
+    def get_tyre_stints(self, session) -> list:
         """
         Returns list of {driver, compound, lap_start, lap_end, tyre_age, colour}
         """
@@ -146,7 +146,7 @@ class FastF1Data:
         except Exception:
             return None
 
-    def get_race_events(self, session) -> list[dict]:
+    def get_race_events(self, session) -> list:
         """
         Parse safety car, VSC, red flag periods from session messages.
         Returns list of {lap, type, message}.
@@ -173,17 +173,27 @@ class FastF1Data:
             elif "SAFETY CAR IN THIS LAP" in msg or "SAFETY CAR WITHDRAWN" in msg:
                 event_type = "GREEN"
             if event_type:
-                # Map timestamp to nearest lap
+                # Map timestamp to nearest lap by converting both to total_seconds
                 msg_time = row.get("Time")
                 lap_num = 1
                 if msg_time is not None and not laps.empty:
-                    diffs = (laps["Time"] - msg_time).abs()
-                    idx = diffs.idxmin()
-                    lap_num = int(laps.loc[idx, "LapNumber"])
+                    try:
+                        # Both laps["Time"] and msg_time should be timedeltas; convert to seconds
+                        def to_seconds(t):
+                            if hasattr(t, "total_seconds"):
+                                return t.total_seconds()
+                            return float(t)
+                        msg_sec = to_seconds(msg_time)
+                        lap_secs = laps["Time"].apply(to_seconds)
+                        diffs = (lap_secs - msg_sec).abs()
+                        idx = diffs.idxmin()
+                        lap_num = int(laps.loc[idx, "LapNumber"])
+                    except Exception:
+                        lap_num = 1
                 events.append({"lap": lap_num, "type": event_type, "message": msg})
         return events
 
-    def get_drivers_info(self, session) -> list[dict]:
+    def get_drivers_info(self, session) -> list:
         """Returns list of {abbr, name, team, colour} for all session drivers."""
         drivers = []
         for abbr in session.drivers:
@@ -275,13 +285,13 @@ class JolpicaData:
     async def _get(self, path: str) -> Optional[dict]:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(f"{self.BASE_URL}{path}?limit=100")
+                resp = await client.get(f"{self.BASE_URL}{path}.json?limit=100")
                 resp.raise_for_status()
                 return resp.json()
         except Exception:
             return None
 
-    async def get_races(self, year: int) -> list[dict]:
+    async def get_races(self, year: int) -> list:
         data = await self._get(f"/{year}")
         if not data:
             return []
@@ -290,7 +300,7 @@ class JolpicaData:
         except (KeyError, TypeError):
             return []
 
-    async def get_results(self, year: int, round_num: int) -> list[dict]:
+    async def get_results(self, year: int, round_num: int) -> list:
         data = await self._get(f"/{year}/{round_num}/results")
         if not data:
             return []
@@ -300,7 +310,7 @@ class JolpicaData:
         except (KeyError, TypeError, IndexError):
             return []
 
-    async def get_standings_after_round(self, year: int, round_num: int) -> list[dict]:
+    async def get_standings_after_round(self, year: int, round_num: int) -> list:
         data = await self._get(f"/{year}/{round_num}/driverStandings")
         if not data:
             return []
@@ -310,7 +320,7 @@ class JolpicaData:
         except (KeyError, TypeError, IndexError):
             return []
 
-    async def get_standings_progression(self, year: int) -> list[dict]:
+    async def get_standings_progression(self, year: int) -> list:
         """Fetch cumulative standings after every round. Returns [{round, race_name, standings: [...]}]"""
         races = await self.get_races(year)
         if not races:
@@ -331,7 +341,7 @@ class JolpicaData:
         results = await asyncio.gather(*[fetch_round(r) for r in races])
         return sorted(results, key=lambda x: x["round"])
 
-    async def get_constructor_standings(self, year: int) -> list[dict]:
+    async def get_constructor_standings(self, year: int) -> list:
         data = await self._get(f"/{year}/constructorStandings")
         if not data:
             return []

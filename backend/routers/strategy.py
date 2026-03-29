@@ -93,7 +93,7 @@ async def get_race_strategy(year: int, round_num: int, response: Response):
 
     # Build lap times dict: {driver: {lap: seconds}}
     laps_df = session.laps[["Driver", "LapNumber", "LapTime", "Position"]].copy()
-    lap_times: dict[str, dict[int, float]] = {}
+    lap_times: dict = {}
     for driver, group in laps_df.groupby("Driver"):
         lap_times[driver] = {}
         for _, row in group.iterrows():
@@ -135,8 +135,8 @@ async def get_race_strategy(year: int, round_num: int, response: Response):
                         pos_after[r2["Driver"]] = int(p)
 
                 # For positions, use all drivers
-                all_pos_before: dict[str, int] = {}
-                all_pos_after: dict[str, int] = {}
+                all_pos_before: dict = {}
+                all_pos_after: dict = {}
                 for _, row2 in laps_df.iterrows():
                     ln = int(row2["LapNumber"])
                     d2 = row2["Driver"]
