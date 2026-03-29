@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import time
+from typing import Optional
 
 import aiosqlite
 
@@ -35,7 +36,7 @@ async def init_db() -> None:
     await conn.close()
 
 
-async def get(key: str) -> dict | None:
+async def get(key: str) -> Optional[dict]:
     """Return cached value or None if missing/expired."""
     conn = await _connect()
     try:

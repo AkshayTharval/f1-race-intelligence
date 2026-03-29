@@ -1,3 +1,4 @@
+from typing import Optional
 """
 Race Story view: animated lap-by-lap position chart with race events.
 """
@@ -8,7 +9,7 @@ import streamlit as st
 
 
 @st.cache_data(ttl=300)
-def _fetch(year: int, round_num: int, backend_url: str) -> dict | None:
+def _fetch(year: int, round_num: int, backend_url: str) -> Optional[dict]:
     try:
         resp = httpx.get(f"{backend_url}/race/{year}/{round_num}/story", timeout=60)
         resp.raise_for_status()

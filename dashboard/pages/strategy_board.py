@@ -1,3 +1,4 @@
+from typing import Optional
 """
 Strategy Board: tyre stint Gantt chart, pit stop timeline, undercut/overcut detector.
 """
@@ -8,7 +9,7 @@ import streamlit as st
 
 
 @st.cache_data(ttl=300)
-def _fetch(year: int, round_num: int, backend_url: str) -> dict | None:
+def _fetch(year: int, round_num: int, backend_url: str) -> Optional[dict]:
     try:
         resp = httpx.get(f"{backend_url}/race/{year}/{round_num}/strategy", timeout=60)
         resp.raise_for_status()

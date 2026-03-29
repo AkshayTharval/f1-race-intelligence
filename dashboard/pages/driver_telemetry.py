@@ -1,3 +1,4 @@
+from typing import Optional
 """
 Driver Telemetry: fastest lap overlay — speed, throttle, brake, gear comparison.
 """
@@ -8,7 +9,7 @@ from plotly.subplots import make_subplots
 
 
 @st.cache_data(ttl=300)
-def _fetch_story(year: int, round_num: int, backend_url: str) -> dict | None:
+def _fetch_story(year: int, round_num: int, backend_url: str) -> Optional[dict]:
     try:
         resp = httpx.get(f"{backend_url}/race/{year}/{round_num}/story", timeout=60)
         resp.raise_for_status()
@@ -18,7 +19,7 @@ def _fetch_story(year: int, round_num: int, backend_url: str) -> dict | None:
 
 
 @st.cache_data(ttl=300)
-def _fetch_telemetry(year: int, round_num: int, driver: str, backend_url: str) -> dict | None:
+def _fetch_telemetry(year: int, round_num: int, driver: str, backend_url: str) -> Optional[dict]:
     try:
         resp = httpx.get(
             f"{backend_url}/race/{year}/{round_num}/telemetry/{driver}", timeout=60

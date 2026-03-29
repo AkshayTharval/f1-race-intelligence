@@ -1,3 +1,4 @@
+from typing import Optional
 """
 Season Standings: championship points progression and teammate head-to-head.
 """
@@ -9,7 +10,7 @@ import streamlit as st
 
 
 @st.cache_data(ttl=300)
-def _fetch(year: int, backend_url: str) -> dict | None:
+def _fetch(year: int, backend_url: str) -> Optional[dict]:
     try:
         resp = httpx.get(f"{backend_url}/season/{year}/standings", timeout=60)
         resp.raise_for_status()

@@ -1,3 +1,4 @@
+from typing import Optional
 """
 Live Race Mode: current session timing, auto-refreshes every 30s when live.
 """
@@ -15,7 +16,7 @@ TYRE_COLOURS = {
 }
 
 
-def _fetch(backend_url: str) -> dict | None:
+def _fetch(backend_url: str) -> Optional[dict]:
     try:
         resp = httpx.get(f"{backend_url}/live/session", timeout=15)
         resp.raise_for_status()

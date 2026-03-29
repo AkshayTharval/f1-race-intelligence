@@ -91,21 +91,21 @@ with st.sidebar:
 st.markdown(f"## 🏁 {race_label}" if race_options else "## 🏁 F1 Race Intelligence")
 
 if view == "Race Story":
-    from dashboard.pages.race_story import render
+    from pages.race_story import render
     render(year, round_num, BACKEND_URL)
 
 elif view == "Strategy Board":
-    from dashboard.pages.strategy_board import render
+    from pages.strategy_board import render
     render(year, round_num, BACKEND_URL)
 
 elif view == "Driver Telemetry":
-    from dashboard.pages.driver_telemetry import render
+    from pages.driver_telemetry import render
     render(year, round_num, BACKEND_URL)
 
 elif view == "Season Standings":
-    from dashboard.pages.season_standings import render
+    from pages.season_standings import render
     render(year, BACKEND_URL)
 
 elif view == "Live Race":
-    from dashboard.pages.live_race import render
+    from pages.live_race import render
     render(BACKEND_URL)

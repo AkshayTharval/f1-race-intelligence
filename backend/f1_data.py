@@ -4,7 +4,7 @@ Data access layer: FastF1, OpenF1, and Jolpica API wrappers.
 import asyncio
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 import fastf1
 import httpx
@@ -108,7 +108,7 @@ class FastF1Data:
                     current_compound = compound
         return stints
 
-    def get_fastest_lap_telemetry(self, session, driver_abbr: str) -> dict | None:
+    def get_fastest_lap_telemetry(self, session, driver_abbr: str) -> Optional[dict]:
         """
         Returns smoothed telemetry for driver's fastest lap.
         Applies rolling(3).mean() to Speed, Throttle, Brake, nGear.
@@ -214,7 +214,7 @@ class FastF1Data:
 class OpenF1Data:
     BASE_URL = "https://api.openf1.org/v1"
 
-    async def _get(self, path: str, params: dict = None) -> list | None:
+    async def _get(self, path: str, params: dict = None) -> Optional[list]:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(f"{self.BASE_URL}{path}", params=params)
@@ -223,31 +223,31 @@ class OpenF1Data:
         except Exception:
             return None
 
-    async def get_sessions(self, year: int, session_type: str = None) -> list | None:
+    async def get_sessions(self, year: int, session_type: str = None) -> Optional[list]:
         params = {"year": year}
         if session_type:
             params["session_type"] = session_type
         return await self._get("/sessions", params)
 
-    async def get_drivers(self, session_key: int) -> list | None:
+    async def get_drivers(self, session_key: int) -> Optional[list]:
         return await self._get("/drivers", {"session_key": session_key})
 
-    async def get_stints(self, session_key: int) -> list | None:
+    async def get_stints(self, session_key: int) -> Optional[list]:
         return await self._get("/stints", {"session_key": session_key})
 
-    async def get_pit_stops(self, session_key: int) -> list | None:
+    async def get_pit_stops(self, session_key: int) -> Optional[list]:
         return await self._get("/pit", {"session_key": session_key})
 
-    async def get_race_control(self, session_key: int) -> list | None:
+    async def get_race_control(self, session_key: int) -> Optional[list]:
         return await self._get("/race_control", {"session_key": session_key})
 
-    async def get_position(self, session_key: int, driver_number: int = None) -> list | None:
+    async def get_position(self, session_key: int, driver_number: int = None) -> Optional[list]:
         params = {"session_key": session_key}
         if driver_number:
             params["driver_number"] = driver_number
         return await self._get("/position", params)
 
-    async def get_live_session(self) -> dict | None:
+    async def get_live_session(self) -> Optional[dict]:
         """Return the most recent or currently active Race session."""
         sessions = await self._get("/sessions", {"session_type": "Race"})
         if not sessions:
@@ -260,7 +260,7 @@ class OpenF1Data:
         )
         return sessions_sorted[0] if sessions_sorted else None
 
-    async def get_lap_times(self, session_key: int, driver_number: int) -> list | None:
+    async def get_lap_times(self, session_key: int, driver_number: int) -> Optional[list]:
         return await self._get("/laps", {"session_key": session_key, "driver_number": driver_number})
 
 
@@ -272,7 +272,7 @@ class OpenF1Data:
 class JolpicaData:
     BASE_URL = "https://api.jolpi.ca/ergast/f1"
 
-    async def _get(self, path: str) -> dict | None:
+    async def _get(self, path: str) -> Optional[dict]:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(f"{self.BASE_URL}{path}?limit=100")
