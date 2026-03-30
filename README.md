@@ -151,6 +151,57 @@ Team colours are hardcoded from official F1 branding (see `TEAM_COLOURS` in `bac
 
 ---
 
+## Running Tests
+
+The test suite uses **pytest** and **pytest-asyncio**. No network calls or FastF1 downloads are needed — all external dependencies are mocked.
+
+### Install test dependencies
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+> The main `requirements.txt` must also be installed (see Quick Start above).
+
+### Run all tests
+
+```bash
+pytest
+```
+
+### Run a specific test file
+
+```bash
+pytest tests/test_cache.py          # TTL cache logic
+pytest tests/test_f1_data.py        # Data processing & API parsing
+pytest tests/test_strategy.py       # Undercut/overcut detector algorithm
+pytest tests/test_routers.py        # HTTP endpoints (cache headers, 404s, etc.)
+```
+
+### Run with verbose output
+
+```bash
+pytest -v
+```
+
+### Test coverage
+
+```bash
+pip install pytest-cov
+pytest --cov=backend --cov-report=term-missing
+```
+
+### What is tested
+
+| Module | Tests cover |
+|--------|------------|
+| `backend/cache.py` | TTL constants, get/set round-trip, expiry, upsert, concurrent writes, idempotent `init_db` |
+| `backend/f1_data.py` | Tyre colours, lap position extraction (NaN fill, retirement), tyre stints, race event parsing (VSC/SC/Red Flag/skips), driver colour logic (team lookup, teammate brightening, fallback palette), OpenF1/Jolpica data parsing |
+| `backend/routers/strategy.py` | Undercut Success, Overcut Success, Undercut Failed, Neutral (no competitors, no lap data, unchanged position), edge cases |
+| `backend/routers/*.py` | Health check, cache HIT/MISS headers, 404 on missing session, driver abbreviation uppercasing, position sorting, colour `#` prefix normalisation |
+
+---
+
 ## Contributing
 
 PRs welcome. Follow the visualisation rules in [CLAUDE.md](CLAUDE.md).
